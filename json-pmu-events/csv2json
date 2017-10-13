@@ -1,0 +1,295 @@
+#!/usr/bin/python
+import os
+
+# Modes of handling duplicate entries
+ADD_DUP = 1;
+SKIP_DUP = 2;
+LONGEST_DUP = 3;
+
+#
+# Primary code (the first in the list) for an event was rather
+# arbitrarily chosen and some of these were removed from mainline
+# tree since perf was confused with duplicate events.
+#
+p9_alt_events = {
+	'PM_CYC'			: ['1E',    '100F0'],
+	'PM_L2_INST'			: ['36080', '3609E'],
+	'PM_SN0_BUSY'			: ['16090', '26090'],
+	'PM_RC0_BUSY'			: ['1608C', '2608C'],
+	'PM_CO0_BUSY'			: ['3608C', '4608C'],
+	'PM_BR_2PATH'			: ['20036', '40036'],
+	'PM_DSLB_MISS'			: ['D0A8',  '10016'],
+	'PM_L2_ST_HIT'			: ['46882', '2689E'],
+	'PM_INST_DISP'			: ['200F2', '300F2'],
+	'PM_INST_CMPL'			: ['2',	    '100FE'],
+	'PM_L2_RTY_LD'			: ['3688A', '3689E'],
+	'PM_L2_RTY_ST'			: ['3608A', '4689E'],
+	'PM_ISLB_MISS'			: ['D8A8',  '40006'],
+	'PM_L2_LD_HIT'			: ['36882', '2609E'],
+	'PM_L2_ST_DISP'			: ['46082', '1689E'],
+	'PM_LD_MISS_L1'			: ['3E054', '400F0'],
+	'PM_L2_LD_DISP'			: ['36082', '1609E'],
+	'PM_L3_CO_MEPF'			: ['3E05E', '168A0'],
+	'PM_L3_RD0_BUSY'		: ['368B4', '468B4'],
+	'PM_L3_WI0_BUSY'		: ['160B6', '260B6'],
+	'PM_L3_CO0_BUSY'		: ['368AC', '468AC'],
+	'PM_L3_SN0_BUSY'		: ['360AC', '460AC'],
+	'PM_L3_PF0_BUSY'		: ['360B4', '460B4'],
+	'PM_L2_INST_MISS'		: ['36880', '4609E'],
+	'PM_LSU_FLUSH_UE'		: ['C0B0',   'D99C'],
+	'PM_LSU_FLUSH_LHS'		: ['C8B0',   'D1A0'],
+	'PM_LSU_FLUSH_SAO'		: ['C0B8',   'D1A4'],
+	'PM_LSU_FLUSH_EMSH'		: ['C0AC',   'D998'],
+	'PM_L2_SN_M_WR_DONE'		: ['16086', '46886'],
+	'PM_LSU_FLUSH_ATOMIC'		: ['C8A8',   'D198'],
+	'PM_LSU_FLUSH_LHL_SHL'		: ['C8B4',   'D9A0'],
+	'PM_LSU_FLUSH_LARX_STCX'	: ['C8B8',   'D9A4'],
+	'PM_LSU_FLUSH_RELAUNCH_MISS'	: ['C8AC',   'D19C'],
+};
+
+#
+# If the event @name has @code as an alternate code, but not as the
+# primary code, return True (so caller can skip adding this @code to
+# the JSON file). Return False in all other cases.
+#
+def skip_code(name, code):
+
+	if (p9_alt_events.has_key(name) and p9_alt_events[name].count(code)):
+		return code != p9_alt_events[name][0];
+
+	return False;
+
+#
+# Add the given [@key, @value] tuples to @dictionary handling duplicates
+# as specified by @dup. Use @msg and @logf to write log/debug messages
+#
+def add_to_dict(dictionary, msg, key, value, dup, logf):
+
+	#
+	# If the dictionary can have multiple values for a key,
+	# use a list item. Otherwise, use a scalar.
+	#
+	if (dup == SKIP_DUP or dup == LONGEST_DUP):
+		values = value;
+	else:
+		values = [];
+		values.append(value);
+
+	#
+	# If key is not in dictionary, just add and go
+	#
+	if (not dictionary.has_key(key)):
+		dictionary[key] = values;
+		return;
+
+	if (dup == SKIP_DUP):
+		return;
+
+	if (dup == LONGEST_DUP):
+		if (len(value) > len(dictionary[key])):
+				dictionary[key] = value;
+		return;
+
+	if (dictionary[key].count(value) == 0):
+		dictionary[key].append(value);
+
+	# print("Dup: dict %s key %s, dictval now %s" %
+	#		(msg, key, dictionary[key]));
+
+#
+# If event has same code across all the 4 PMCs, except for the PMC number
+# drop the PMC number and use the common code.
+# Eg:
+#	   PM_SUSPENDED has codes [10000,20000,30000,40000]. Use code 0x0.
+#	   PM_INST_CMPL has codes [10002,20002,30002,40002]. Use 0x2
+#	   PM_DSLB_MISS has codes [D0A8,D0A8,D0A8,D0A8]. Use D0A8.
+#
+# In other cases, list all the non-zero event codes separately.
+#
+def sanitize_pmcs(name, pmc1, pmc2, pmc3, pmc4):
+
+	n = 0;
+
+	codes = [];
+	c1 = c2 = c3 = c4 = 0;
+	if (len(pmc1)):
+		c1 = int(pmc1, 16) & 0xFFFF;
+		codes.append(pmc1);
+		n += 1;
+
+	if (len(pmc2)):
+		c2 = int(pmc2, 16) & 0xFFFF;
+		codes.append(pmc2);
+		n += 1;
+
+	if (len(pmc3)):
+		c3 = int(pmc3, 16) & 0xFFFF;
+		codes.append(pmc3);
+		n += 1;
+
+	if (len(pmc4)):
+		c4 = int(pmc4, 16) & 0xFFFF;
+		codes.append(pmc4);
+		n += 1;
+
+	if (n == 4 and c1 == c2 == c3 == c4):
+		codes = [];
+		# Use the code with PMC number stripped out.
+		# .lstrip() will strip the event code if the code is 0x0
+		# (eg PM_SUSPEND in Power9). Use replace() instead.
+		#
+		codes.append(hex(c1).replace("0x", "").upper());
+
+	return codes;
+
+#
+# If at least one category is not "other" go with that. Eg: if
+# event has "pipeline" and "other" categories, use "pipeline".
+# Otherwise, just use the first one.
+#
+def choose_category(name, catlist):
+
+	rc = catlist[0];
+	for cat in catlist:
+		if (cat != "other"):
+			rc = cat;
+			break;
+	return rc;
+
+def log_event(logf, name, pmc1, pmc2, pmc3, pmc4, codelist, desc, category):
+
+	logf.write("----------\n");
+	logf.write("Name: %s\n" % (name));
+	logf.write("PMCs: [%s,%s,%s,%s]\n" % (pmc1, pmc2, pmc3, pmc4));
+	logf.write("Codelist: %s\n" % codelist);
+	logf.write("Desc: %s\n" % (desc));
+	logf.write("Cat: %s\n" % (category));
+
+def dump_name2codes(name2codes):
+
+	i = 0;
+	for name in name2codes.keys():
+		if (len(name2codes[name]) > 1):
+			if (i == 0):
+				print("Events with multiple codes:");
+			i += 1;
+			print("\t[\'%s\'] : %s" % (name, name2codes[name]));
+	print("Found %d events with multiple codes" % i);
+
+def dump_code2names(code2names):
+	i = 0;
+	for code in code2names.keys():
+		if (len(code2names[code]) > 1):
+			if (i == 0):
+				print("Events with multiple names:");
+
+			i += 1;
+			print("\t%s -> %s" % (code, code2names[code]));
+
+	print("Found %d codes with multiple names" % i);
+
+def dump_categories(name2cat):
+	i = 0;
+	for name in name2cat.keys():
+		if (len(name2cat[name]) > 1):
+			if (i == 0):
+				print("Events with multiple categories:");
+			i += 1;
+			print("\t%s -> %s" % (name, name2cat[name]));
+	print("Found %d events with multiple categories" % i);
+#
+# Main
+#
+f = open("p9events.csv", "r");
+p9events = f.readlines();
+f.close();
+
+cat_files = {};
+first_write = {};
+name2codes = {};
+code2names = {};
+name2cat = {};
+name2desc = {};
+
+logf = open("log-csv2json", "w");
+
+i = 0;
+first = True;
+code = "";
+codelist = [];
+for eline in p9events:
+	if (first):
+		first = 0;
+		continue;
+	eline = eline.rstrip();
+	#print eline;
+	if (len(eline) == 0):
+		continue;
+
+	(pmc1,pmc2,pmc3,pmc4,name,status,category,desc) = eline.split(";",7);
+	pmc1 = pmc1.lstrip("0");
+	pmc2 = pmc2.lstrip("0");
+	pmc3 = pmc3.lstrip("0");
+	pmc4 = pmc4.lstrip("0");
+
+	desc = desc.strip();
+	desc = desc.replace("\"", "");
+
+	codelist = sanitize_pmcs(name, pmc1, pmc2, pmc3, pmc4);
+
+	if (category == "" or category == "empty" or category == "NA"):
+		category = "other";
+	else:
+		category = category.replace(' ', '-');
+
+	log_event(logf, name, pmc1, pmc2, pmc3, pmc4, codelist, desc, category);
+
+	# Add any duplicate entries we find in name2codes, code2namess and
+	# name2cats so we can error check. For duplicate events, use the
+	# longest of the descriptions.
+	for code in codelist:
+		add_to_dict(name2codes, "n2code", name, code, ADD_DUP, logf);
+		add_to_dict(code2names, "c2name", code, name, ADD_DUP, logf);
+
+	add_to_dict(name2cat, "n2cat", name, category, ADD_DUP, logf);
+	add_to_dict(name2desc, "n2desc", name, desc, LONGEST_DUP, logf);
+
+	if (cat_files.has_key(category) == False):
+		fname = "new-pmu-events/" + category + ".json";
+		f = open(fname, "w");
+		cat_files[category] = f;
+		first_write[category] = True;
+		f.write("[\n");
+
+dump_name2codes(name2codes);
+dump_code2names(code2names);
+dump_categories(name2cat);
+
+for name in name2codes.keys():
+
+	category = choose_category(name, name2cat[name]);
+	desc = name2desc[name];
+	codelist = name2codes[name];
+	f = cat_files[category];
+
+	logf.write("Name %s, codes %s\n" % (name, codelist));
+	for code in codelist:
+
+		if (skip_code(name, code)):
+			continue;
+
+		# Add trailing comma only if its not the last entry in category
+		if (not first_write[category]):
+			f.write(",\n");
+		first_write[category] = False;
+
+		f.write("  {,\n");
+		f.write("    \"EventCode\": \"0x" + code + "\",\n");
+		f.write("    \"EventName\": \"" + name + "\",\n");
+		f.write("    \"BriefDescription\": \"" + desc + "\"\n");
+		f.write("  }");
+
+for k in cat_files.keys():
+	f = cat_files[k];
+	f.write("\n]");
+	f.close();

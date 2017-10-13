@@ -1,0 +1,99 @@
+#!/usr/bin/python
+
+# Compare two sets of JSON files
+# Use this to compare/summarize differences between a newly generated
+# set of JSON files with the existing (mainline) JSON files.
+
+import sys
+
+def process_category(cat, path, code2name, code2cat):
+
+    file_name = path + "/" + cat + ".json";
+
+    catfile = open(file_name, "r");
+    lines = catfile.readlines();
+    catfile.close();
+
+    for line in lines:
+        line = line.strip();
+        if (line == "[" or line == "{,"):
+            code = "";
+            name = "";
+            continue;
+        elif (line == "}," or line == "}" or line == "]" ):
+            continue;
+        elif (line.find("BriefDescription") == 1):
+            continue;
+        
+        if (line.find("EventCode") == 1):
+            (field, code) = line.split(" ", 1);
+            code = code.strip(",");
+            code = code.strip("\"");
+            continue;
+
+        if (line.find("EventName") == 1):
+            (field, name) = line.split(" ", 1);
+            name = name.strip("\"");
+            name = name.strip("\"");
+
+            code2name[code] = name;
+            code2cat[code] = cat;
+
+
+cat_list = ["cache", "floating-point", "frontend", "marked", "memory",
+            "other", "pipeline", "pmc", "translation"];
+
+old_dir = "mainline/";
+new_dir = "new-pmu-events/";
+
+if (len(sys.argv) > 1):
+	old_dir = sys.argv[1];
+
+if (len(sys.argv) > 2):
+	new_dir = sys.argv[2];
+
+old_code2name = {};
+old_code2cat = {};
+new_code2name = {};
+new_code2cat = {};
+
+for cat in cat_list:
+    process_category(cat, old_dir, old_code2name, old_code2cat);
+
+for cat in cat_list:
+    process_category(cat, new_dir, new_code2name, new_code2cat);
+
+for code in old_code2name.keys():
+
+    # New table does not have this code, or
+    if (not new_code2name.has_key(code)):
+        print("Drop  event: %s, %s" % (code, old_code2name[code]));
+        continue;
+
+    # has the code, but different name or 
+    if (new_code2name[code] != old_code2name[code]):
+        print("Change Name: %s, %s, %s" % (code, old_code2name[code],
+                    new_code2name[code]));
+
+    # ...different category
+    if (new_code2cat[code] != old_code2cat[code]):
+        print("Change Category: %s, %s, %s" % (code, old_code2cat[code],
+                    new_code2cat[code]));
+
+for code in new_code2name.keys():
+
+    # Old table does not have this code, or
+    if (not old_code2name.has_key(code)):
+        print("New  event: %s, %s" % (code, new_code2name[code]));
+        continue;
+
+    # has the code, but different name or 
+    if (new_code2name[code] != old_code2name[code]):
+        print("Change Name: %s, %s, %s" % (code, old_code2name[code],
+                    new_code2name[code]));
+
+    # ...different category
+    if (new_code2cat[code] != old_code2cat[code]):
+        print("Change Category: %s, %s, %s" % (code, old_code2cat[code],
+                    new_code2cat[code]));
+
