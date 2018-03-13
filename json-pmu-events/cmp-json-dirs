@@ -33,7 +33,7 @@ def process_category(cat, path, code2name, code2cat):
 
         if (line.find("EventName") == 1):
             (field, name) = line.split(" ", 1);
-            name = name.strip("\"");
+            name = name.strip(",");
             name = name.strip("\"");
 
             code2name[code] = name;
