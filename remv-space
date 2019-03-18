@@ -1,0 +1,48 @@
+#!/usr/bin/python
+
+import re
+import os
+import sys
+
+def usage(msg):
+	print(msg);
+	print("Usage %s [-f] <src_file> [destination-dir]" % sys.argv[0]);
+	sys.exit(-1);
+
+n_args = len(sys.argv);
+if (n_args < 2):
+	usage("Missing src file");
+elif (n_args > 4):
+	usage("Too many args");
+
+force = 0;
+idx = 1;
+if (sys.argv[idx] == "-f"):
+	force = 1;
+	if (n_args < 3):
+		usage("Missing src file");
+	idx += 1;
+
+src = sys.argv[idx];
+idx += 1;
+
+destdir = "";
+if (idx < n_args):
+	destdir = sys.argv[idx];
+
+dest =  re.sub(' +', '-', src, 0);
+
+if (len(destdir)):
+	dest = destdir + "/" + os.path.basename(dest);
+
+if (not os.access(src, os.F_OK)):
+	print("Source '%s' not found!" % (src));
+	sys.exit(-1);
+
+if (os.access(dest, os.F_OK) and force == 0):
+	print("Destination '%s' exists, ignoring" % (dest));
+	sys.exit(-2);
+
+print("Renaming '%s' to %s, force %d" % (src, dest, force));
+#os.rename(src, dest);
+
