@@ -1,0 +1,50 @@
+"
+" Need this to allow files to have a :vim line near the end?
+" On Macbook, we also need the modelines=1
+"
+set modeline
+set modelines=1
+set ruler
+
+set         ts=8 sw=8 sm aw ai ws scrolloff=0
+
+" Use the 'jk' sequence as an alternate way to enter view mode i.e.
+" as a substitute for the escape key. Useful if esc key is small.
+inoremap jk <ESC>
+
+" Code lifted from suggested usage of :cs help
+if has("cscope")
+	set nocsverb
+	set csprg=/usr/bin/cscope
+	set csto=0
+	set cst
+	set nocsverb
+	if filereadable("cscope.out")
+		cs add cscope.out
+	elseif filereadable("db.out")
+		cs add db.out
+	elseif $CSCOPE_DB != ""
+		cs add $CSCOPE_DB
+	endif
+	set csverb
+endif
+
+"map <F2>    :TlistToggle
+"map <F3>   :!rst2html % > /tmp/rst.html 2>/tmp/rst.errors
+"map <F4>   O:r!/bin/echo -ne "`date +"\%Y/\%m/\%d:"`"A ------------
+"map <F5>   oSigned-off-by: Sukadev Bhattiprolu <sukadev@linux.ibm.com>
+
+
+" 1 red 2 green 3 yellow 6 light blue 7 white 5 cyan ? 
+hi DiffAdd term=bold cterm=bold ctermbg=6
+hi DiffText cterm=bold term=bold ctermbg=2
+hi DiffChange term=bold ctermbg=3
+hi Search term=reverse ctermfg=4 ctermbg=7
+"hi Folded ctermfg=5 ctermbg=3
+set bg=dark
+
+set nofoldenable
+
+
+filetype plugin indent on
+syntax on
