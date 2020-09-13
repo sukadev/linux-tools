@@ -1,5 +1,5 @@
 .. list-table:: **Basics**
-    :widths: 10 60
+    :widths: 15 60
 
     * - **Keys**
       - **Action**
@@ -7,36 +7,36 @@
     * - ESC
       - Enter command mode
 
-    * - :q!
+    * - :q! <ENTER>
       - Quit file without saving changes
 
-    * - :wq
+    * - :wq <ENTER>
       - Quit file after writing (saving) changes
 
     * - i
       - Leaves command mode and enter insert mode. In insert mode, all
         characters, except ESC are entered as text into the file.
             
-    * - :n
+    * - :n <ENTER>
       - Go to next file if any (ie if you opened several files using
         `vi file1 file2 file3`, :n will take you to next file.
 
-    * - :n file7
+    * - :n file7 <ENTER>
       - Close current file and open the file named file7
 
-    * - :n #
+    * - :n # <ENTER>
       - Return to file we were editing previously
 
-    * - :se nu
+    * - :se nu <ENTER>
       - Display line numbers
 
-    * - :se nonu
+    * - :se nonu <ENTER>
       - Hide line numbers
 
-    * - :se ts=4
+    * - :se ts=4 <ENTER>
       - Set tabstop to 4 spaces
 
-    * - :help topic
+    * - :help topic <ENTER>
       - Show help on topic
 
 .. list-table:: **Navigating within a file**
@@ -57,7 +57,7 @@
     * - h
       - Move to previous character on the line (if any)
 
-    * - |
+    * - | (pipe or shift-backslash)
       - Go to first character on current line
 
     * - ^
@@ -75,7 +75,7 @@
     * - M
       - (Middle) Go to middle line on screen
 
-    * - ''(single quote aka forward tick)
+    * - ''(two single quotes aka forward ticks)
       -  Return to previous location in same file. Repeating this will
          toggle between same two locations.  See also CTRL-O
 
@@ -107,6 +107,13 @@
       - Return to previous location (even if it was in a different file)
         This works like the Back button in web browser and keeps going
         back in history.
+
+    * - mX
+      - Create a mark (bookmark) named X (where X is any alphanumeric char)
+        (you can create several such bookmarks with different characters)
+
+    * - 'X
+      - Return to bookmark named X
 
     * - CTRL-I
       - Go to the next location (i.e reverse of CTRL-O) and works like
@@ -141,6 +148,12 @@
 
     * - I
       - Insert at the beginning of the line. Use ESC to end insert.
+
+    * - o
+      - Open a new line below the cursor and enter INSERT mode
+
+    * - O
+      - Open a new line above the cursor and enter INSERT mode
 
     * - yy
       - Yank (copy) current line. Optionally prefix with a number to
@@ -211,7 +224,7 @@
     * - ?pattern
       - Search backward in the file for pattern
 
-    * - *
+    * - * (asterisk)
       - Find the next occurrence of the word that is under cursor
 
     * - n
@@ -258,6 +271,44 @@
         Then we are in insert mode and "GHI JKL" are entered literally. When
         we hit ESC we are back in command mode)
 
+    * - ==
+      - Indent current line (useful when editing source code) Optionally
+        prefix with a number to indent N lines
+
+    * - ='X
+      - Indent until previously bookmarked location X
+
+    * - >>
+      - Shift current line to right. Optionally prefix with number to
+        shift N lines. Use ``:se sw=Y`` to change default shift width
+        to Y chars if necessary. Eg: :se sw=16<ENTER> sets shift width
+        to 16.
+
+    * - <<
+      - Shift current line to left. Optionally prefix with number to
+        shift N lines. Use ``:se sw=Y`` to change default shift width
+        to Y chars if necessary. Eg: :se sw=16<ENTER> sets shift width
+        to 16.
+
+    * - >'X or <'X
+      - Shift all lines until previously bookmarked location X right (or
+        or left).
+
+    * - y'X
+      - Copy all lines from current line to the previously bookmarked
+        location X (see mX above)
+
+    * - d'X
+      - delete all lines from current line to the previously bookmarked
+        location X (see mX above)
+
+    * - d/pattern
+      - Delete all text until next occurrence of pattern (see /pattern
+        above
+
+    * - J
+      - Join next line with current line
+
     * - Pattern substitution
       - Use ``:%s /pattern1/replacement text/`` to  substitute. i.e.
         replace 'pattern1` in file with `replacement text`. If `pattern1`
@@ -268,34 +319,6 @@
             ``:%s /pattern1/replacement text/g``
 
         If you dont like the substitution, you can type `u` to undo
-
-.. list-table:: **Bookmarks**
-    :widths: 10 60
-
-    * - **Keys**
-      - **Action**
-
-    * - mX
-      - Create a mark (bookmark) named X (where X is any alphanumeric char)
-        (you can create several such bookmarks with different characters)
-
-    * - 'X
-      - Return to bookmark named X
-
-    * - y'X
-      - Copy all lines from current line to the previously book marked
-        location X (see mX above)
-
-    * - d'X
-      - delete all lines from current line to the previously book marked
-        location X (see mX above)
-
-    * - d/pattern
-      - Delete all text until next occurrence of pattern (see /pattern
-        above
-
-    * - J
-      - Join next line with current line
 
 Named buffers
 -------------
