@@ -16,7 +16,7 @@
     * - i
       - Leaves command mode and enter insert mode. In insert mode, all
         characters, except ESC are entered as text into the file.
-            
+
     * - :n <ENTER>
       - Go to next file if any (ie if you opened several files using
         `vi file1 file2 file3`, :n will take you to next file.
@@ -259,7 +259,7 @@
         until next occurrence of X (i.e we enter INSERT mode now.
         Hit ESC after you are done with the changes).
 
-        With the line 
+        With the line
 
             ABC DEF ghi 123
 
@@ -309,6 +309,17 @@
     * - J
       - Join next line with current line
 
+    * - :r ~/file1
+      - Insert the entire contents of ~/file1 below the cursor
+
+    * - :r! date
+      - Insert the output of the `date` command below the cursor
+        (as always, type u to undo if necessary)
+
+    * - :r! ls
+      - Insert the output of the `ls` command below the cursor
+        (as always, type u to undo if necessary)
+
     * - Pattern substitution
       - Use ``:%s /pattern1/replacement text/`` to  substitute. i.e.
         replace 'pattern1` in file with `replacement text`. If `pattern1`
@@ -319,6 +330,7 @@
             ``:%s /pattern1/replacement text/g``
 
         If you dont like the substitution, you can type `u` to undo
+
 
 Named buffers
 -------------
@@ -368,3 +380,56 @@ Named buffers
       - Delete all lines from current line till the previously bookmarked
         location X and save them into a buffer named A (this is like d'X
         above, except we save in a named buffer)
+
+Entering control characters
+----------------------------
+
+    To type/enter control characters in text in vi (when in insert mode)
+    prefix the control key sequence with CTRL-V.
+
+    When in insert mode, if we type ESC, we enter view mode. To enter a
+    literal ESC key in your text, prefix the ESC with CTRL-V. i.e
+    CTRL-V followed by ESC (without any spaces).
+
+    Similarly, other control characters could have special meaning. Eg:
+
+        - CTRL-M: New line
+        - CTRL-I:    Tab
+        - CTRL-C: Cancel (Unix)
+        - CTRL-Z: suspend program (Unix)
+
+    To enter the literal control character in your text (and avoid the
+    special meaning) prefix the control key sequence with CTRL-V. eg:
+    CTRL-V followed by CTRL-Z (no spaces).
+
+Mapping keys
+------------
+
+    If you have a long or frequently used set of VIM key sequences, you
+    can map a key to the sequence and type the single key.
+
+    In vim type `:map <F2> :!ls <CTRL-V><CTRL-M>`
+
+    (I added the angle-brackets to separate CTRL-V and CTRL-M. don't type
+    the angle brackets!)
+
+    Now, when you type F2, it will list contents of your current directory
+    (i.e executes the shell command `ls`).
+
+    Rather than doing the :map every time you start vim, you can add following
+    line in your ~/.vimrc as:
+
+    .. code::
+
+        map <F2> :!ls <CTRL-V><CTRL-M>
+
+    I also have
+
+    .. code::
+
+        map <F5>    oSigned-off-by: Sukadev Bhattiprolu <sukadevb@gmail.com>
+
+    where the last character is the escape key (enter using CTRL-V followed
+    by ESC). When I type F5, it first runs the 'o' command which opens a line
+    below and enters insert mode. Then it types in 'Signed-off...' and finally
+    when it sees the ESC key at the end, enters view mode.
