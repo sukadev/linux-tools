@@ -3,7 +3,7 @@ grep Invocations
 
     ``grep -r <pattern> <directory>``
 
-        Recursive search the directory and print lines containing
+        Recursively search the directory and print lines containing
         pattern. (Case sensitive search)
 
         NOTE:  If any of the files in other examples refer to a
@@ -76,8 +76,37 @@ Patterns
       - The question-mark indicates ZERO OR ONE
         Match 0 or 1 occurrences of a lower-case alphabet.
 
+    * - . (period)
+      - Match any character. Eg: abc.ef will match abcDef abcXef, abc$ef
+        etc. You can attach a * , +, ? or * to indicate "zero or more",
+        "one or more" or "zero or 1" as described above
+
+    * - abc.def
+      - Match abc followed by any single character, followed by def.
+        (The period can match space, tab, special character, digit but
+        not newline (I think) or NULL). Matches "abcXdef", "abc&def",
+        "abc7def", "abc def", but NOT "abcdef". "abcdDef"
+
+    * - [abc]
+      - Match any character in the set abc. Square brackets define a
+        set of characters to match
+
     * - [a-zA-Z]
-      - Match lower or upper case alphabet in that position
+      - Match lower or upper case alphabet
+
+    * - [^A-Z]
+      - Match any character that is NOT in the set [A-Z]
+
+    * - []]
+      - Match the closing square bracket itself (on some implementations
+        it may need to be first character in the set to override its
+        special meaning)
+
+    * - ^abc
+      - Match abc only if its at the beginning of the line
+
+    * - abc$
+      - Match abc only if its at the end of the line
 
     * - [0-9a-zA-Z]
       - Match an alpha numeric character
@@ -137,4 +166,4 @@ Patterns
         pattern2 - where pattern1 or pattern2 can be any other legal
         pattern.
 
-vim: ft=rst
+vim: ft=rst et
