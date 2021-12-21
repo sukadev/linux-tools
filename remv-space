@@ -44,5 +44,5 @@ if (os.access(dest, os.F_OK) and force == 0):
 	sys.exit(-2);
 
 print("Renaming '%s' to %s, force %d" % (src, dest, force));
-#os.rename(src, dest);
+os.rename(src, dest);
 
