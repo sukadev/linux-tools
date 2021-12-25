@@ -1,0 +1,264 @@
+#!/usr/bin/python
+
+import exifread
+import os.path
+import hashlib
+import string
+import sys
+import re
+
+global Logdir
+global Topdir
+global Cameranicks
+global Cameraslist
+
+def log_msg(msg):
+
+    # TODO: Enable detailed logging to file
+    #Logfd.write(msg + "\n")
+
+    print(msg)
+
+
+Topdir = os.getenv("MYPHOTO_TOP_DIR")
+if (not Topdir):
+    print("Please set MYPHOTO_TOP_DIR and try again")
+    sys.exit(1)
+Topdir += "/"
+
+Logdir = os.getenv("MYPHOTO_LOG_DIR")
+if (not Logdir):
+    print("Please set MYPHOTO_LOG_DIR and try again")
+    sys.exit(1)
+Logdir += "/"
+
+Cameraslist = os.getenv("MYPHOTO_CAMERA_LIST")
+if (not Cameraslist):
+    log_msg("Please set MYPHOTO_CAMERA_LIST and try again")
+    sys.exit()
+
+# TODO: logfile should be a command line option or generated based on
+#       timestamp?
+Logfile = Logdir + "2021-1224-Logfile-mypy.txt"
+
+Logfd = open(Logfile, "w")   # TODO: Don't overwrite log files!
+
+def load_camera_list():
+    global Cameranicks
+
+    fd = open(Cameraslist, "r")
+    lines = fd.readlines()
+    fd.close()
+
+    Cameranicks = {}
+
+    for line in lines:
+        line = line.strip(None)
+        if (re.search('^#', line)):
+            continue
+
+        if (not re.search(':', line)):
+            continue
+
+        (serial, nick) = line.split(':', 1)
+        serial = serial.strip()
+        nick = nick.strip()
+
+        if (serial in Cameranicks.keys()):
+            msg = "Duplicate camera, serial " + serial
+            msg += " " + Cameranicks[serial] + " and " + nick
+            log_msg(msg)
+            sys.exit()
+
+        Cameranicks[serial] = nick;
+
+    print("Loaded %d cameras:" % (len(Cameranicks.keys())))
+    for s in Cameranicks.keys():
+        print("\t", s, Cameranicks[s])
+
+def hashfile(fname, length):
+    f = open(fname, "rb")
+    hasher = hashlib.md5()
+    bsize = 65536
+    if (length < bsize):
+        bsize = length
+
+    rsize = 0
+    buf = f.read(bsize)
+    while (1):
+        hasher.update(buf)
+        if (length == 0 or rsize >= length):
+            break
+        rsize += bsize
+        buf = f.read(bsize)
+
+    return hasher.hexdigest()
+
+def is_duplicate(file1, file2):
+    h1 = hashfile(file1, 65536)
+    h2 = hashfile(file2, 65536)
+    if (h1 == h2):
+        h1 = hashfile(file1, 0)
+        h2 = hashfile(file2, 0)
+
+    if (h1 != h2):
+        msg = "Digests: " + file1 + " " + h1 + ", " + file2 + " " + h2
+        log_msg(msg)
+
+    return h1 == h2
+
+def sanitize_camera(name, tags):
+
+    global Cameranicks
+
+    make = str(tags['Image Make'])
+    model = str(tags['Image Model'])
+    model = model.replace(" ", "-")
+
+    serial = str(tags['EXIF BodySerialNumber'])
+    try:
+        nick = Cameranicks[serial]
+    except KeyError:
+        msg  = name + ": [UNKNOWN-CAMERA ("
+        msg += make
+        msg += ", " + model
+        msg += ", " + serial
+        msg += ")]"
+
+        log_msg(msg)
+        nick = None
+
+    return nick
+
+# Pathname: YYYY / YYYY-MMDD-Camera-Nickname / IMG_1234.JPG
+def exif_to_path(name, tags):
+
+    try:
+        (D, t) = str(tags['EXIF DateTimeOriginal']).split()
+    except KeyError:
+        log_msg("Not a JPEG file? EXIF DateTimeOriginal tag not found")
+        return None
+
+    (y, m, d) = D.split(':')
+
+    camera = sanitize_camera(name, tags)
+    if (not camera):
+        return
+
+    path = Topdir + y + "/"
+    path += y + "-" + m + d + "-" + camera + "/"
+
+    path += os.path.basename(name)
+    return path
+
+def get_exif_tags(fname):
+
+    f = open(fname, "rb")
+    tags = exifread.process_file(f)
+    f.close()
+
+    #print_interesting_tags(tags)
+    return tags
+
+def process_file(fname, op):
+    #global Logf
+
+    tags = get_exif_tags(fname)
+    if (not tags):
+        return
+
+    path = exif_to_path(fname, tags)
+    if (not path):
+        return
+
+    dirname = os.path.dirname(path)
+
+    msg = fname + ": Destination " + path
+
+    if (op == "show-dest"):
+        log_msg(msg)
+        return
+
+    # operation is either "check-dest" or "move-jpeg"
+    exists = False
+    if (os.path.isfile(path)):
+        exists = True
+        if (is_duplicate(fname, path)):
+            msg += " [DUPLICATE]"
+        else:
+            msg += " [COLLISION]"
+
+        log_msg(msg)
+    elif (op == "check-dest"):
+        msg += " [SUCCESS]"
+        log_msg(msg)
+        return
+
+    if (not exists and op == "move-jpeg"):
+        os.makedirs(dirname, exist_ok=True)
+        os.rename(fname, path)
+        msg += "[DONE]"
+        log_msg(msg)
+
+interesting_tags = (
+                    'EXIF BodySerialNumber',
+                    'EXIF CameraOwnerName',
+                    'EXIF DateTimeOriginal',
+                    'Image Make',
+                    'Image Model',
+                    'Image DateTime',
+                    'MakerNote ModelID',
+                    'MakerNote OwnerName')
+
+def print_interesting_tags(tags):
+
+    for tag in tags:
+
+        if (tag in interesting_tags):
+            tabs = "\t"
+            if (len(tag) < 16):
+                    tabs = "\t\t"
+            print(tag, tabs, tags[tag])
+
+def walk_path(dname, op):
+
+    for (root, dirs, files) in os.walk(dname):
+        for name in files:
+            fname = os.path.join(root, name)
+            process_file(fname, op)
+
+
+if (__name__ == "__main__"):
+
+    op = "show-dest"
+    arg = None
+
+    if (len(sys.argv) - 1 == 0):
+        idx = 0
+    elif (len(sys.argv) - 1 > 0):
+        idx = 2
+        if (sys.argv[1] == "show-dest"):
+            op = "show-dest"
+        elif (sys.argv[1] == "check-dest"):
+            op = "check-dest"
+        elif (sys.argv[1] == "move-jpeg"):
+            op = "move-jpeg"
+        else:
+            idx = 1
+
+    arg = sys.argv[idx]
+    print("Operation: ", op, " Args ", arg)
+
+    if (not arg):
+        print("Usage: myphoto <op>  <jpeg_file_or_dir>\n")
+        sys.exit()
+
+    load_camera_list()
+
+    if (os.path.isdir(arg)):
+        walk_path(arg, op)
+    elif (os.path.isfile(arg)):
+        process_file(arg, op)
+    else:
+        print("%s: Invalid file type\n" % (arg))
+        sys.exit()
